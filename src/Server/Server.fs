@@ -43,19 +43,22 @@ let logout = pipeline {
 let logged_in_view = router {
     pipe_through login
 
-    get "/user-credentials" (fun next ctx -> task {
+    get "/google" (fun next ctx -> task {
         let name = ctx.User.Claims |> Seq.filter (fun claim -> claim.Type = ClaimTypes.Name) |> Seq.head
         return! json { user_name = name.Value } next ctx
     })
 }
-let default_view = router {
-    get "/" (fun next ctx -> task {
-        return! next ctx
+
+let fake_auth_view = router {
+    get "/fake-login" (fun next ctx -> task {
+        return! json {user_name = "John Doe" } next ctx
     })
 }
+
 let webApp = router {
     pipe_through (pipeline { set_header "x-pipeline-type" "Api" })
-    forward "/api" logged_in_view
+    forward "/auth" logged_in_view
+    forward "/fake-auth" fake_auth_view
 }
 
 let configureSerialization (services:IServiceCollection) =
@@ -83,7 +86,7 @@ let app google_id google_secret =
         service_config configureSerialization
         use_gzip
         use_google_oauth google_id google_secret "/oauth_callback_google" []
-        use_cors "localhost:8080" configure_cors
+        //use_cors "localhost:8080" configure_cors
     }
 
 (* Use a maybe computation expression. In the case where one is not defined

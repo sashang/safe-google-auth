@@ -10,12 +10,14 @@ open Fulma
 open Shared
 
 type LoginState =
-| FirstTime
-| Failed
+| Out
+| In
 
 type Msg =
 | GetLoginGoogle
+| GetFakeLogin
 | GotLoginGoogle of UserCredentialsResponse
+| GotFakeLogin of UserCredentialsResponse
 | ErrorMsg of exn
 
 type Model = {
@@ -24,65 +26,65 @@ type Model = {
 }
 
 let init _ =
-    {login_state = FirstTime; user_info = None}, Cmd.none
+    {login_state = Out; user_info = None}, Cmd.none
 
 let get_credentials () =
     promise {
-        let! credentials = Fetch.fetchAs<UserCredentialsResponse> ("/api/user-credentials") []
+        let! credentials = Fetch.fetchAs<UserCredentialsResponse> ("/auth/google") []
+        return credentials
+    }
+
+let get_fake_credentials () =
+    promise {
+        let! credentials = Fetch.fetchAs<UserCredentialsResponse> ("/fake-auth/fake-login") []
         return credentials
     }
 
 let update (msg : Msg) (model : Model) : Model*Cmd<Msg> =
     match msg with
     | GetLoginGoogle ->
-        { login_state = FirstTime; user_info = None }, Cmd.ofPromise get_credentials () GotLoginGoogle ErrorMsg
+        { login_state = Out; user_info = None }, Cmd.ofPromise get_credentials () GotLoginGoogle ErrorMsg
+    | GetFakeLogin ->
+        { login_state = Out; user_info = None }, Cmd.ofPromise get_fake_credentials () GotFakeLogin ErrorMsg        
     | GotLoginGoogle credentials ->
-        { login_state = FirstTime; user_info = Some credentials }, Cmd.none
-    | ErrorMsg _ -> { login_state = Failed; user_info = None }, Cmd.none
+        { login_state = In; user_info = Some credentials }, Cmd.none
+    | GotFakeLogin credentials ->
+        { login_state = In; user_info = Some credentials }, Cmd.none
+    | ErrorMsg _ -> { login_state = Out; user_info = None }, Cmd.none
 
 
-let column (dispatch : Msg -> unit) =
-    Column.column
-        [ Column.Width (Screen.All, Column.Is4)
-          Column.Offset (Screen.All, Column.Is4) ]
-        [ Heading.h3
-            [ Heading.Modifiers [ Modifier.TextColor IsGrey ] ]
-            [ str "Login" ]
-          Heading.p
-            [ Heading.Modifiers [ Modifier.TextColor IsGrey ] ]
-            [ str "Please login to proceed." ]
-          Box.box' [ ]
-            [ figure [ Class "avatar" ]
-                [ img [ Src "https://placehold.it/128x128" ] ]
-              form [ ]
-                [ Field.div [ ]
-                    [ Control.div [ ]
-                        [ Input.email
-                            [ Input.Size IsLarge
-                              Input.Placeholder "Your Email"
-                              Input.Props [ AutoFocus true ] ] ] ]
-                  Field.div [ ]
-                    [ Control.div [ ]
-                        [ Input.password
-                            [ Input.Size IsLarge
-                              Input.Placeholder "Your Password" ] ] ]
-                  Field.div [ ]
-                    [ Checkbox.checkbox [ ]
-                        [ input [ Type "checkbox" ]
-                          str "Remember me" ] ]
-                  Button.button
-                    [ Button.Color IsPrimary
-                      Button.IsFullWidth
-                      Button.OnClick (fun _ -> (dispatch GetLoginGoogle))
-                      Button.CustomClass "is-large is-block" ]
-                    [ str "Login" ] ] ]
-          Text.p [ Modifiers [ Modifier.TextColor IsGrey ] ]
-            [ a [ ] [ str "Sign Up" ]
-              str "\u00A0·\u00A0"
-              a [ ] [ str "Forgot Password" ]
-              str "\u00A0·\u00A0"
-              a [ ] [ str "Need Help?" ] ]
-          br [ ] ]
+let column (dispatch : Msg -> unit) (model : Model) =
+    Column.column [
+        Column.Width (Screen.All, Column.Is4)
+        Column.Offset (Screen.All, Column.Is4)
+    ] [
+        Heading.h3 [
+            Heading.Modifiers [ Modifier.TextColor IsGrey ]
+        ] [ str "Login" ]
+        Box.box' [ ] [
+            Button.button [
+                Button.Color IsPrimary
+                Button.IsFullWidth
+                Button.OnClick (fun _ -> (dispatch GetLoginGoogle))
+                Button.CustomClass "is-large is-block"
+            ] [ str "Auth with Google" ]
+            Button.button [
+                Button.Color IsPrimary
+                Button.IsFullWidth
+                Button.OnClick (fun _ -> (dispatch GetFakeLogin))
+                Button.CustomClass "is-large is-block"
+            ] [ str "Fake auth" ]            
+        ]
+        Text.p [
+            Modifiers [ Modifier.TextColor IsGrey ]
+        ] [ a [ ] [ str "Current user" ]
+            str "\u00A0·\u00A0"
+            a [ ] [ str (match model.user_info with
+                          | None -> "Unknown user"
+                          | Some user -> user.user_name) ]
+        ]
+    ]
+
 
 
 let view (model : Model) (dispatch : Msg -> unit) =
@@ -93,7 +95,7 @@ let view (model : Model) (dispatch : Msg -> unit) =
         [ Hero.body [ ]
             [ Container.container
                 [ Container.Modifiers [ Modifier.TextAlignment (Screen.All, TextAlignment.Centered) ] ]
-                [ column dispatch ] ] ]
+                [ column dispatch model ] ] ]
 
 
 #if DEBUG
