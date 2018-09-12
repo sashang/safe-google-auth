@@ -68,7 +68,7 @@ let configureSerialization (services:IServiceCollection) =
     services.AddSingleton<IJsonSerializer>(NewtonsoftJsonSerializer fableJsonSettings)
 
 let configure_cors (builder : CorsPolicyBuilder) =
-    builder.WithOrigins("http://localhost:8085")
+    builder.WithOrigins("http://localhost:8080")
         .AllowAnyMethod()
         .AllowAnyHeader()
     |> ignore
