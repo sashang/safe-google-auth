@@ -56,7 +56,8 @@ let fake_auth_view = router {
 }
 
 let webApp = router {
-    pipe_through (pipeline { set_header "x-pipeline-type" "Api" })
+    pipe_through (pipeline { set_header "x-pipeline-type" "Api"
+                             set_header "Access-Control-Allow-Origin" "true"})
     forward "/auth" logged_in_view
     forward "/fake-auth" fake_auth_view
 }
@@ -67,7 +68,7 @@ let configureSerialization (services:IServiceCollection) =
     services.AddSingleton<IJsonSerializer>(NewtonsoftJsonSerializer fableJsonSettings)
 
 let configure_cors (builder : CorsPolicyBuilder) =
-    builder.WithOrigins("http://localhost:8080")
+    builder.WithOrigins("http://localhost:8085")
         .AllowAnyMethod()
         .AllowAnyHeader()
     |> ignore
@@ -86,7 +87,7 @@ let app google_id google_secret =
         service_config configureSerialization
         use_gzip
         use_google_oauth google_id google_secret "/oauth_callback_google" []
-        //use_cors "localhost:8080" configure_cors
+        use_cors "localhost:8080" configure_cors        
     }
 
 (* Use a maybe computation expression. In the case where one is not defined
